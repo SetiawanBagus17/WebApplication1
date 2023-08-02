@@ -16,7 +16,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpPost]
-        [Route("AddUserTask")]
+        [Route("AddUserWithTask")]
 
         public IActionResult AddUserTask([FromBody] InputModel? input)
         {

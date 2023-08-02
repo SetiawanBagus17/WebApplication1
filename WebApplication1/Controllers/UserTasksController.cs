@@ -5,7 +5,7 @@ using WebApplication1.Models;
 
 namespace WebApplication1.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/tasks")]
     [ApiController]
     public class UserTasksController : ControllerBase
     {
@@ -99,64 +99,118 @@ namespace WebApplication1.Controllers
 
         [HttpGet]
         [Route("GetUserWithTask")]
-        public IActionResult GetTasks(string name)
+        public IActionResult GetTasks(string? name)
         {
             List<UserModel> users = new List<UserModel>();
 
-            try
-            {
-                using (MySqlConnection conn = new MySqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+            if (string.IsNullOrEmpty(name)) {
+                try
                 {
-                    conn.Open();
+                    using (MySqlConnection conn = new MySqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+                    {
+                        conn.Open();
 
-                    string query = @"
+                        string query = @"
+                        SELECT u.pk_users_id, u.name, t.pk_tasks_id, t.task_detail
+                        FROM Users u
+                        LEFT JOIN Tasks t ON u.pk_users_id = t.fk_user_id";
+
+                        MySqlCommand cmd = new MySqlCommand(query, conn);
+                        using (MySqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            int currentUserId = 0;
+                            UserModel currentUser = null;
+
+                            while (reader.Read())
+                            {
+                                int userId = reader.GetInt32("pk_users_id");
+
+                                if (userId != currentUserId)
+                                {
+                                    currentUser = new UserModel
+                                    {
+                                        pk_users_id = userId,
+                                        name = reader.GetString("name"),
+                                        tasks = new List<TaskModel>()
+                                    };
+                                    users.Add(currentUser);
+                                    currentUserId = userId;
+                                }
+
+                                if (!reader.IsDBNull(reader.GetOrdinal("pk_tasks_id")))
+                                {
+                                    currentUser.tasks.Add(new TaskModel
+                                    {
+                                        pk_tasks_id = reader.GetInt32("pk_tasks_id"),
+                                        task_detail = reader.GetString("task_detail")
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (MySqlException ex)
+                {
+                    return StatusCode(StatusCodes.Status500InternalServerError, "Database Error");
+                }
+
+                return Ok(users);
+            } else
+            {
+                try
+                {
+                    using (MySqlConnection conn = new MySqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+                    {
+                        conn.Open();
+
+                        string query = @"
                         SELECT u.pk_users_id, u.name, t.pk_tasks_id, t.task_detail
                         FROM Users u
                         LEFT JOIN Tasks t ON u.pk_users_id = t.fk_user_id
                         WHERE u.name = @userName";
 
-                    MySqlCommand cmd = new MySqlCommand(query, conn);
-                    cmd.Parameters.AddWithValue("@userName", name);
+                        MySqlCommand cmd = new MySqlCommand(query, conn);
+                        cmd.Parameters.AddWithValue("@userName", name);
 
-                    using (MySqlDataReader reader = cmd.ExecuteReader())
-                    {
-                        int currentUserId = 0;
-                        UserModel currentUser = null;
-
-                        while (reader.Read())
+                        using (MySqlDataReader reader = cmd.ExecuteReader())
                         {
-                            int userId = reader.GetInt32("pk_users_id");
+                            int currentUserId = 0;
+                            UserModel currentUser = null;
 
-                            if (userId != currentUserId)
+                            while (reader.Read())
                             {
-                                currentUser = new UserModel
-                                {
-                                    pk_users_id = userId,
-                                    name = reader.GetString("name"),
-                                    tasks = new List<TaskModel>()
-                                };
-                                users.Add(currentUser);
-                                currentUserId = userId;
-                            }
+                                int userId = reader.GetInt32("pk_users_id");
 
-                            if (!reader.IsDBNull(reader.GetOrdinal("pk_tasks_id")))
-                            {
-                                currentUser.tasks.Add(new TaskModel
+                                if (userId != currentUserId)
                                 {
-                                    pk_tasks_id = reader.GetInt32("pk_tasks_id"),
-                                    task_detail = reader.GetString("task_detail")
-                                });
+                                    currentUser = new UserModel
+                                    {
+                                        pk_users_id = userId,
+                                        name = reader.GetString("name"),
+                                        tasks = new List<TaskModel>()
+                                    };
+                                    users.Add(currentUser);
+                                    currentUserId = userId;
+                                }
+
+                                if (!reader.IsDBNull(reader.GetOrdinal("pk_tasks_id")))
+                                {
+                                    currentUser.tasks.Add(new TaskModel
+                                    {
+                                        pk_tasks_id = reader.GetInt32("pk_tasks_id"),
+                                        task_detail = reader.GetString("task_detail")
+                                    });
+                                }
                             }
                         }
                     }
                 }
+                catch (MySqlException ex)
+                {
+                    return StatusCode(StatusCodes.Status500InternalServerError, "Database Error");
+                }
+                return Ok(users);
             }
-            catch (MySqlException ex)
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, "Database Error");
-            }
-
-            return Ok(users);
         }
     }
 }
